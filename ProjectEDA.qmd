@@ -1,0 +1,73 @@
+1. Load Data 
+```{r}
+# Import libraries
+set.seed(2)
+library(ggplot2)
+
+train_values <- read.csv("train_values.csv")
+train_labels <- read.csv("train_labels.csv")
+
+# Merge values and labels by building_id
+buildings <- merge(train_values, train_labels, by = "building_id")
+
+# Check dimensions
+dim(buildings)
+
+# Check for missing values
+colSums(is.na(buildings))
+
+# Change categorical values to factors
+categorical <- c(
+  "geo_level_1_id",
+  "geo_level_2_id",
+  "geo_level_3_id",
+  "land_surface_condition",
+  "foundation_type",
+  "roof_type",
+  "ground_floor_type",
+  "other_floor_type",
+  "position",
+  "plan_configuration",
+  "legal_ownership_status",
+  "damage_grade"
+)
+
+buildings[categorical] <- lapply(
+  buildings[categorical],
+  as.factor
+)
+
+summary(buildings)
+
+# Distribution of response variable
+ggplot(buildings, aes(x = damage_grade)) +
+  geom_bar() +
+  labs(
+    x = "Damage Grade",
+    y = "Count",
+    title = "Distribution of Damage Grade"
+  )
+```
+
+2. Numeric Features
+
+numeric_features <- c(
+  "count_floors_pre_eq",
+  "age",
+  "area_percentage",
+  "height_percentage",
+  "count_families"
+)
+
+3. Categorical Variables
+
+categorical_features <- c(
+  "land_surface_condition",
+  "foundation_type",
+  "roof_type",
+  "ground_floor_type",
+  "other_floor_type",
+  "position",
+  "plan_configuration",
+  "legal_ownership_status"
+)
