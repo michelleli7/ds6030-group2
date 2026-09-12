@@ -51,6 +51,7 @@ ggplot(buildings, aes(x = damage_grade)) +
 
 2. Numeric Features
 
+```{r}
 numeric_features <- c(
   "count_floors_pre_eq",
   "age",
@@ -59,8 +60,27 @@ numeric_features <- c(
   "count_families"
 )
 
+plots <- lapply(numeric_features, function(feature) {
+  ggplot(buildings, aes(
+    x = .data[[feature]],
+    y = damage_grade
+  )) +
+    geom_jitter(alpha = 0.3, height = 0.1) +
+    labs(
+      x = feature,
+      y = "Damage grade",
+      title = paste("Damage grade vs", feature)
+    )
+})
+
+plots
+```
+
+
+
 3. Categorical Variables
 
+```{r}
 categorical_features <- c(
   "land_surface_condition",
   "foundation_type",
@@ -71,3 +91,23 @@ categorical_features <- c(
   "plan_configuration",
   "legal_ownership_status"
 )
+
+plots <- lapply(categorical_features, function(feature) {
+
+  ggplot(buildings, aes(
+    x = .data[[feature]],
+    fill = factor(damage_grade)
+  )) +
+    geom_bar(position = "fill") +
+    labs(
+      x = feature,
+      y = "Proportion",
+      fill = "Damage grade",
+      title = paste("Damage grade vs", feature)
+    ) +
+    coord_flip()
+
+})
+
+plots
+```
