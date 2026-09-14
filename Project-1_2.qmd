@@ -76,6 +76,38 @@ plots <- lapply(numeric_features, function(feature) {
 plots
 ```
 
+### Inspect age
+```{r}
+
+table(buildings$age[buildings$age > 200])
+
+table(
+  extreme_age = buildings$age > 200,
+  damage_grade = buildings$damage_grade
+)
+
+# Filter buildings with age 995
+age_995 <- buildings[buildings$age == 995, ]
+
+
+age_995_sample <- age_995[
+  sample(nrow(age_995), 30),
+  c(
+    "age",
+    "damage_grade",
+    "geo_level_1_id",
+    "count_floors_pre_eq",
+    "area_percentage",
+    "height_percentage",
+    "foundation_type",
+    "roof_type",
+    "ground_floor_type",
+    "other_floor_type"
+  )
+]
+
+age_995_sample
+```
 
 
 3. Categorical Variables
