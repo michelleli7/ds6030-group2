@@ -1,8 +1,11 @@
+Cecilia Barnsby, Bhavya Devarsu, Michelle Li, Rhiannon Staley, Jarmarr Washington 
+
 1. Load Data 
 ```{r}
 # Import libraries
 set.seed(2)
 library(ggplot2)
+library(tidyverse)
 
 train_values <- read.csv("train_values.csv")
 train_labels <- read.csv("train_labels.csv")
@@ -60,7 +63,7 @@ numeric_features <- c(
   "count_families"
 )
 
-plots <- lapply(numeric_features, function(feature) {
+plots <- purrr::map(numeric_features, function(feature) {
   ggplot(buildings, aes(
     x = .data[[feature]],
     y = damage_grade
@@ -124,7 +127,7 @@ categorical_features <- c(
   "legal_ownership_status"
 )
 
-plots <- lapply(categorical_features, function(feature) {
+plots <- purrr::map(categorical_features, function(feature) {
 
   ggplot(buildings, aes(
     x = .data[[feature]],
