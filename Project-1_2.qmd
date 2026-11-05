@@ -22,8 +22,6 @@ colSums(is.na(buildings))
 # Change categorical values to factors
 categorical <- c(
   "geo_level_1_id",
-  "geo_level_2_id",
-  "geo_level_3_id",
   "land_surface_condition",
   "foundation_type",
   "roof_type",
@@ -146,3 +144,63 @@ plots <- purrr::map(categorical_features, function(feature) {
 
 plots
 ```
+
+### START MODELS
+
+4. Multinomial logistic regression 
+
+First, we will fit and evaluate a simple multi-class logistic regression model. 
+
+```{r}
+library(rsample)
+library(tidymodels)
+library(parsnip)
+
+buildings <- buildings %>%
+  select(-building_id, -geo_level_2_id, -geo_level_3_id)
+
+data_split <- initial_split(
+  data = buildings,
+  prop = 0.60,
+  strata = damage_grade
+)
+
+train_data <- training(data_split)
+test_data <- testing(data_split)
+
+cv_folds <- vfold_cv(
+  train_data,
+  v = 5,
+  strata = damage_grade
+)
+
+lr_spec <- multinom_reg() %>% 
+  set_engine("nnet") %>%
+  set_mode("classification")
+
+lr_fit <- lr_spec %>% 
+  fit(damage_grade ~ ., data = train_data)
+
+lr_results <- fit_resamples(
+  lr_spec,
+  damage_grade ~ .,
+  resamples = cv_folds,
+  metrics = metric_set(accuracy, f_meas)
+)
+
+collect_metrics(lr_results)
+```
+
+5. Random Forest 
+
+
+6. SVM
+
+
+7. XGBoost
+
+
+8. LDA
+
+
+
