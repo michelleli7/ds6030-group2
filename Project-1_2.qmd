@@ -170,7 +170,7 @@ test_data <- testing(data_split)
 
 cv_folds <- vfold_cv(
   train_data,
-  v = 5,
+  v = 10,
   strata = damage_grade
 )
 
@@ -201,6 +201,33 @@ collect_metrics(lr_results)
 
 
 8. LDA
+```{r}
+library(discrim)
+
+lda_spec <- discrim_linear() %>%
+  set_engine("MASS") %>%
+  set_mode("classification")
+
+lda_fit <- lda_spec %>%
+  fit(damage_grade ~ ., data = train_data)
+
+lda_results <- fit_resamples(
+  lda_spec,
+  damage_grade ~ .,
+  resamples = cv_folds,
+  metrics = metric_set(accuracy, f_meas)
+)
+
+collect_metrics(lda_results)
+
+#Test Data Performance
+lda_predictions <- predict(lda_fit, test_data) %>%
+  bind_cols(test_data %>% select(damage_grade))
+
+accuracy(lda_predictions, truth = damage_grade, estimate = .pred_class)
+f_meas(lda_predictions, truth = damage_grade, estimate = .pred_class)
+conf_mat(lda_predictions, truth = damage_grade, estimate = .pred_class)
+```
 
 
 
