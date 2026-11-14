@@ -192,7 +192,165 @@ collect_metrics(lr_results)
 ```
 
 5. Random Forest 
+```{r}
+set.seed(2)
 
+rf_spec <- rand_forest(mode = "classification", trees = tune(), min_n = tune(), mtry = tune()) |>
+  set_engine("ranger", importance = "impurity") 
+
+rf_grid <- grid_random(
+  trees(range = c(100L, 500L)),
+  mtry(range = c(2L, 15L)),
+  min_n(range = c(2L, 20L)),
+  size = 10
+)
+
+rf_grid
+```
+
+
+```{r random forest tuning}
+set.seed(2)
+
+rf_tuned <- tune_grid(
+  rf_spec,
+  damage_grade ~ .,
+  resamples = cv_folds,
+  grid = rf_grid,
+  metrics = metric_set(f_meas, accuracy, bal_accuracy),
+  control = control_grid(save_pred = FALSE, verbose = TRUE
+  )
+)
+```
+
+```{r}
+show_best(rf_tuned, metric = "f_meas")
+```
+
+```{r}
+autoplot(rf_tuned)
+```
+
+```{r}
+rf_best <- select_best(rf_tuned,metric = "f_meas")
+rf_best
+```
+
+```{r}
+rf_final <- finalize_model(rf_spec,rf_best)
+rf_final
+```
+
+```{r rf final fit}
+set.seed(2)
+
+rf_last_fit <- last_fit(
+  rf_final,
+  damage_grade ~ .,
+  split = data_split,
+  metrics = metric_set(f_meas,accuracy,bal_accuracy)
+)
+
+collect_metrics(rf_last_fit)
+```
+
+```{r}
+rf_predictions <- collect_predictions(rf_last_fit)
+
+rf_recall <- rf_predictions |>
+  group_by(damage_grade) |>
+  summarise(
+    recall = mean(.pred_class == damage_grade),
+    observations = n(),
+    .groups = "drop"
+  )
+rf_recall
+
+rf_confusion <- conf_mat(
+  rf_predictions,
+  truth = damage_grade,
+  estimate = .pred_class
+)
+rf_confusion
+
+autoplot(rf_confusion, type = "heatmap") +
+  labs(
+    title = "Random Forest Confusion Matrix",
+    x = "Actual Damage Grade",
+    y = "Predicted Damage Grade"
+  ) +
+  theme_minimal()
+```
+
+```{r rf importance}
+rf_fitted <- extract_fit_engine(rf_last_fit)
+
+rf_importance <- tibble(
+  predictor = names(rf_fitted$variable.importance),
+  importance = as.numeric(rf_fitted$variable.importance)
+) |>
+  arrange(desc(importance))
+
+rf_importance |>
+  slice_head(n = 10)
+
+rf_importance |>
+  slice_head(n = 10) |>
+  mutate(predictor = forcats::fct_reorder(predictor, importance)) |>
+  ggplot(aes(x = importance, y = predictor)) +
+  geom_col(fill = "steelblue") +
+  labs(
+    title = "Top 10 Random Forest Predictors",
+    x = "Impurity-Based Importance",
+    y = "Building Characteristic"
+  ) +
+  theme_minimal()
+```
+### Class-weighted Random Forest
+
+```{r Class Weighted Random Forest}
+class_counts <- table(train_data$damage_grade)
+
+class_weights <- as.numeric(
+  sum(class_counts) /
+  (length(class_counts) * class_counts)
+)
+
+names(class_weights) <- names(class_counts)
+class_weights
+```
+
+```{r}
+rf_weighted_spec <- rand_forest(mode = "classification", trees = 440, min_n = 10, mtry = 12) |>
+  set_engine("ranger", class.weights = !!class_weights, importance = "none")
+
+set.seed(2)
+
+rf_weighted_cv <- fit_resamples(
+  rf_weighted_spec,
+  damage_grade ~ .,
+  resamples = cv_folds,
+  metrics = metric_set(f_meas, accuracy,bal_accuracy),
+  control = control_resamples(save_pred = TRUE, verbose = TRUE)
+)
+```
+
+```{r}
+collect_metrics(rf_weighted_cv)
+```
+
+
+```{r}
+rf_weighted_predictions <- collect_predictions(rf_weighted_cv)
+
+rf_weighted_predictions |>
+  group_by(damage_grade) |>
+  summarise(
+    recall = mean(.pred_class == damage_grade),
+    observations = n(),
+    .groups = "drop"
+  )
+```
 
 6. SVM
 
