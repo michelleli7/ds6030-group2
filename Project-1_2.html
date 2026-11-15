@@ -705,7 +705,7 @@ extreme_age      1      2      3
 <span id="cb35-14"><a href="#cb35-14" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb35-15"><a href="#cb35-15" aria-hidden="true" tabindex="-1"></a>cv_folds <span class="ot">&lt;-</span> <span class="fu">vfold_cv</span>(</span>
 <span id="cb35-16"><a href="#cb35-16" aria-hidden="true" tabindex="-1"></a>  train_data,</span>
-<span id="cb35-17"><a href="#cb35-17" aria-hidden="true" tabindex="-1"></a>  <span class="at">v =</span> <span class="dv">5</span>,</span>
+<span id="cb35-17"><a href="#cb35-17" aria-hidden="true" tabindex="-1"></a>  <span class="at">v =</span> <span class="dv">10</span>,</span>
 <span id="cb35-18"><a href="#cb35-18" aria-hidden="true" tabindex="-1"></a>  <span class="at">strata =</span> damage_grade</span>
 <span id="cb35-19"><a href="#cb35-19" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb35-20"><a href="#cb35-20" aria-hidden="true" tabindex="-1"></a></span>
@@ -720,24 +720,89 @@ extreme_age      1      2      3
 <span id="cb35-29"><a href="#cb35-29" aria-hidden="true" tabindex="-1"></a>  lr_spec,</span>
 <span id="cb35-30"><a href="#cb35-30" aria-hidden="true" tabindex="-1"></a>  damage_grade <span class="sc">~</span> .,</span>
 <span id="cb35-31"><a href="#cb35-31" aria-hidden="true" tabindex="-1"></a>  <span class="at">resamples =</span> cv_folds,</span>
-<span id="cb35-32"><a href="#cb35-32" aria-hidden="true" tabindex="-1"></a>  <span class="at">metrics =</span> <span class="fu">metric_set</span>(accuracy, f_meas)</span>
-<span id="cb35-33"><a href="#cb35-33" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb35-34"><a href="#cb35-34" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-35"><a href="#cb35-35" aria-hidden="true" tabindex="-1"></a><span class="fu">collect_metrics</span>(lr_results)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb35-32"><a href="#cb35-32" aria-hidden="true" tabindex="-1"></a>  <span class="at">metrics =</span> <span class="fu">metric_set</span>(accuracy, bal_accuracy, f_meas),</span>
+<span id="cb35-33"><a href="#cb35-33" aria-hidden="true" tabindex="-1"></a>  <span class="at">control =</span> <span class="fu">control_resamples</span>(<span class="at">save_pred =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb35-34"><a href="#cb35-34" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb35-35"><a href="#cb35-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb35-36"><a href="#cb35-36" aria-hidden="true" tabindex="-1"></a><span class="fu">collect_metrics</span>(lr_results)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code># A tibble: 2 × 6
-  .metric  .estimator  mean     n  std_err .config        
-  &lt;chr&gt;    &lt;chr&gt;      &lt;dbl&gt; &lt;int&gt;    &lt;dbl&gt; &lt;chr&gt;          
-1 accuracy multiclass 0.670     5 0.000938 pre0_mod0_post0
-2 f_meas   macro      0.591     5 0.000822 pre0_mod0_post0</code></pre>
+<pre><code># A tibble: 3 × 6
+  .metric      .estimator  mean     n  std_err .config        
+  &lt;chr&gt;        &lt;chr&gt;      &lt;dbl&gt; &lt;int&gt;    &lt;dbl&gt; &lt;chr&gt;          
+1 accuracy     multiclass 0.671    10 0.000732 pre0_mod0_post0
+2 bal_accuracy macro      0.672    10 0.000944 pre0_mod0_post0
+3 f_meas       macro      0.591    10 0.00142  pre0_mod0_post0</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb37"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a>lr_predictions <span class="ot">&lt;-</span> <span class="fu">collect_predictions</span>(lr_results)</span>
+<span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb37-3"><a href="#cb37-3" aria-hidden="true" tabindex="-1"></a>lr_recall <span class="ot">&lt;-</span> lr_predictions <span class="sc">%&gt;%</span></span>
+<span id="cb37-4"><a href="#cb37-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(damage_grade) <span class="sc">%&gt;%</span></span>
+<span id="cb37-5"><a href="#cb37-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
+<span id="cb37-6"><a href="#cb37-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">recall =</span> <span class="fu">mean</span>(.pred_class <span class="sc">==</span> damage_grade),</span>
+<span id="cb37-7"><a href="#cb37-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">observations =</span> <span class="fu">n</span>(),</span>
+<span id="cb37-8"><a href="#cb37-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">.groups =</span> <span class="st">"drop"</span></span>
+<span id="cb37-9"><a href="#cb37-9" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb37-10"><a href="#cb37-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb37-11"><a href="#cb37-11" aria-hidden="true" tabindex="-1"></a>lr_recall</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 3 × 3
+  damage_grade recall observations
+  &lt;fct&gt;         &lt;dbl&gt;        &lt;int&gt;
+1 1             0.357        15037
+2 2             0.808        88945
+3 3             0.527        52378</code></pre>
 </div>
 </div>
-<ol start="5" type="1">
-<li><p>Random Forest</p></li>
-<li><p>SVM</p></li>
-<li><p>XGBoost</p></li>
-<li><p>LDA</p></li>
-</ol>
+<p>We can use oversampling because of our uneven class distribution. Oversampling will help ensure that we have equal representation from each damage grade.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb39"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(themis) </span>
+<span id="cb39-2"><a href="#cb39-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb39-3"><a href="#cb39-3" aria-hidden="true" tabindex="-1"></a>lr_over_recipe <span class="ot">&lt;-</span> <span class="fu">recipe</span>(damage_grade <span class="sc">~</span> ., <span class="at">data =</span> train_data) <span class="sc">%&gt;%</span></span>
+<span id="cb39-4"><a href="#cb39-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">step_upsample</span>(damage_grade, <span class="at">over_ratio =</span> <span class="dv">1</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb39-5"><a href="#cb39-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">step_zv</span>(<span class="fu">all_predictors</span>()) <span class="sc">%&gt;%</span></span>
+<span id="cb39-6"><a href="#cb39-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">step_dummy</span>(<span class="fu">all_nominal_predictors</span>()) <span class="sc">%&gt;%</span></span>
+<span id="cb39-7"><a href="#cb39-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">step_normalize</span>(<span class="fu">all_numeric_predictors</span>())</span>
+<span id="cb39-8"><a href="#cb39-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb39-9"><a href="#cb39-9" aria-hidden="true" tabindex="-1"></a>lr_over_workflow <span class="ot">&lt;-</span> <span class="fu">workflow</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb39-10"><a href="#cb39-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_recipe</span>(lr_over_recipe) <span class="sc">%&gt;%</span></span>
+<span id="cb39-11"><a href="#cb39-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_model</span>(lr_spec)</span>
+<span id="cb39-12"><a href="#cb39-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb39-13"><a href="#cb39-13" aria-hidden="true" tabindex="-1"></a>lr_over_results <span class="ot">&lt;-</span> <span class="fu">fit_resamples</span>(</span>
+<span id="cb39-14"><a href="#cb39-14" aria-hidden="true" tabindex="-1"></a>  lr_over_workflow,</span>
+<span id="cb39-15"><a href="#cb39-15" aria-hidden="true" tabindex="-1"></a>  <span class="at">resamples =</span> cv_folds,</span>
+<span id="cb39-16"><a href="#cb39-16" aria-hidden="true" tabindex="-1"></a>  <span class="at">metrics =</span> <span class="fu">metric_set</span>(accuracy, bal_accuracy, f_meas),</span>
+<span id="cb39-17"><a href="#cb39-17" aria-hidden="true" tabindex="-1"></a>  <span class="at">control =</span> <span class="fu">control_resamples</span>(<span class="at">save_pred =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb39-18"><a href="#cb39-18" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb39-19"><a href="#cb39-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb39-20"><a href="#cb39-20" aria-hidden="true" tabindex="-1"></a><span class="fu">collect_metrics</span>(lr_over_results)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 3 × 6
+  .metric      .estimator  mean     n  std_err .config        
+  &lt;chr&gt;        &lt;chr&gt;      &lt;dbl&gt; &lt;int&gt;    &lt;dbl&gt; &lt;chr&gt;          
+1 accuracy     multiclass 0.592    10 0.00131  pre0_mod0_post0
+2 bal_accuracy macro      0.724    10 0.000858 pre0_mod0_post0
+3 f_meas       macro      0.570    10 0.00136  pre0_mod0_post0</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb41"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a>lr_over_predictions <span class="ot">&lt;-</span> <span class="fu">collect_predictions</span>(lr_over_results)</span>
+<span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb41-3"><a href="#cb41-3" aria-hidden="true" tabindex="-1"></a>lr_over_recall <span class="ot">&lt;-</span> lr_over_predictions <span class="sc">%&gt;%</span></span>
+<span id="cb41-4"><a href="#cb41-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(damage_grade) <span class="sc">%&gt;%</span></span>
+<span id="cb41-5"><a href="#cb41-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
+<span id="cb41-6"><a href="#cb41-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">recall =</span> <span class="fu">mean</span>(.pred_class <span class="sc">==</span> damage_grade),</span>
+<span id="cb41-7"><a href="#cb41-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">observations =</span> <span class="fu">n</span>(),</span>
+<span id="cb41-8"><a href="#cb41-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">.groups =</span> <span class="st">"drop"</span></span>
+<span id="cb41-9"><a href="#cb41-9" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb41-10"><a href="#cb41-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb41-11"><a href="#cb41-11" aria-hidden="true" tabindex="-1"></a>lr_over_recall</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 3 × 3
+  damage_grade recall observations
+  &lt;fct&gt;         &lt;dbl&gt;        &lt;int&gt;
+1 1             0.775        15037
+2 2             0.487        88945
+3 3             0.717        52378</code></pre>
+</div>
+</div>
 </section>
 
 </main>
