@@ -189,11 +189,9 @@ lr_results <- fit_resamples(
   control = control_resamples(save_pred = TRUE)
 )
 
-collect_metrics(lr_results)
+lr_baseline_predictions <- collect_predictions(lr_results)
 
-lr_predictions <- collect_predictions(lr_results)
-
-lr_recall <- lr_predictions %>%
+lr_recall <- lr_baseline_predictions %>%
   group_by(damage_grade) %>%
   summarise(
     recall = mean(.pred_class == damage_grade),
@@ -202,6 +200,18 @@ lr_recall <- lr_predictions %>%
   )
 
 lr_recall
+
+lr_baseline_conf_mat <- conf_mat(
+  lr_baseline_predictions,
+  truth = damage_grade,
+  estimate = .pred_class
+)
+
+lr_baseline_conf_mat
+
+autoplot(lr_baseline_conf_mat, type = "heatmap")
+
+saveRDS(lr_results, "lr_baseline_results.rds")
 ```
 
 We can use oversampling because of our uneven class distribution. Oversampling will help ensure that we have equal representation from each damage grade. 
@@ -227,8 +237,6 @@ lr_over_results <- fit_resamples(
   control = control_resamples(save_pred = TRUE)
 )
 
-collect_metrics(lr_over_results)
-
 lr_over_predictions <- collect_predictions(lr_over_results)
 
 lr_over_recall <- lr_over_predictions %>%
@@ -240,6 +248,18 @@ lr_over_recall <- lr_over_predictions %>%
   )
 
 lr_over_recall
+
+lr_over_conf_mat <- conf_mat(
+  lr_over_predictions,
+  truth = damage_grade,
+  estimate = .pred_class
+)
+
+lr_over_conf_mat
+
+autoplot(lr_over_conf_mat, type = "heatmap")
+
+saveRDS(lr_over_results, "lr_oversampling_results.rds")
 ```
 
 
@@ -571,6 +591,3 @@ accuracy(lda_predictions, truth = damage_grade, estimate = .pred_class)
 f_meas(lda_predictions, truth = damage_grade, estimate = .pred_class)
 conf_mat(lda_predictions, truth = damage_grade, estimate = .pred_class)
 ```
-
-
-
