@@ -567,27 +567,48 @@ autoplot(svm_confusion, type = "heatmap") +
 ```{r}
 library(discrim)
 
+#Model
 lda_spec <- discrim_linear() %>%
   set_engine("MASS") %>%
   set_mode("classification")
 
-lda_fit <- lda_spec %>%
-  fit(damage_grade ~ ., data = train_data)
+#Cross-Validation
+set.seed(2)
 
-lda_results <- fit_resamples(
-  lda_spec,
+lda_results <- fit_resamples(lda_spec,
   damage_grade ~ .,
   resamples = cv_folds,
-  metrics = metric_set(accuracy, f_meas)
-)
+  metrics = metric_set(f_meas, accuracy, bal_accuracy),
+  control = control_resamples(save_pred = TRUE))
 
+#CV Performance
 collect_metrics(lda_results)
 
-#Test Data Performance
-lda_predictions <- predict(lda_fit, test_data) %>%
-  bind_cols(test_data %>% select(damage_grade))
+#Final Model on Test
+set.seed(2)
 
-accuracy(lda_predictions, truth = damage_grade, estimate = .pred_class)
-f_meas(lda_predictions, truth = damage_grade, estimate = .pred_class)
-conf_mat(lda_predictions, truth = damage_grade, estimate = .pred_class)
+lda_last_fit <- last_fit(lda_spec,
+  damage_grade ~ .,
+  split = data_split,
+  metrics = metric_set(f_meas, accuracy, bal_accuracy))
+
+collect_metrics(lda_last_fit)
+
+#Test Set Predictions
+lda_predictions <- collect_predictions(lda_last_fit)
+
+#Recall
+lda_recall <- lda_predictions %>%
+  group_by(damage_grade) %>%
+  summarise(recall = mean(.pred_class == damage_grade),
+    observations = n(), .groups = "drop")
+lda_recall
+
+#Confusion Matrix
+lda_conf_mat <- conf_mat(lda_predictions,
+  truth = damage_grade, estimate = .pred_class)
+lda_conf_mat
+
+#Save Results
+saveRDS(lda_results, "lda_results.rds")
 ```
