@@ -610,5 +610,9 @@ lda_conf_mat <- conf_mat(lda_predictions,
 lda_conf_mat
 
 #Save Results
-saveRDS(lda_results, "lda_results.rds")
+lda_saved <- list(cv_results = lda_results,
+  test_results = lda_last_fit,
+  class_recall = lda_recall,
+  confusion_matrix = lda_conf_mat)
+saveRDS(lda_saved, "lda_results.rds")
 ```
