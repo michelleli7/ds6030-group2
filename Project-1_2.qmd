@@ -624,6 +624,10 @@ xgb_pred |>
   )
 ```
 
+```{r}
+conf_mat(xgb_pred, truth = damage_grade, estimate = .pred_class)
+```
+
 8. LDA
 ```{r}
 library(discrim)
