@@ -488,13 +488,29 @@ collect_metrics(rf_weighted_cv)
 ```{r}
 rf_weighted_predictions <- collect_predictions(rf_weighted_cv)
 
-rf_weighted_predictions |>
+rf_weighted_recall <- rf_weighted_predictions |>
   group_by(damage_grade) |>
   summarise(
     recall = mean(.pred_class == damage_grade),
     observations = n(),
     .groups = "drop"
   )
+rf_weighted_recall
+
+rf_weighted_confusion <- conf_mat(
+  rf_weighted_predictions,
+  truth = damage_grade,
+  estimate = .pred_class
+)
+rf_weighted_confusion
+
+autoplot(rf_weighted_confusion, type = "heatmap") +
+  labs(
+    title = "Random Forest Confusion Matrix",
+    x = "Actual Damage Grade",
+    y = "Predicted Damage Grade"
+  ) +
+  theme_minimal()
 ```
 
 
