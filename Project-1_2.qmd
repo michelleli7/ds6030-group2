@@ -422,38 +422,20 @@ rf_weighted_predictions |>
   )
 ```
 
-6. SVM
 
 6. SVM
 
 ```{r svm setup}
 library(kernlab)
 
-set.seed(2)
-
-# Stratified subsample for tuning
-svm_train <- train_data %>%
-  group_by(damage_grade) %>%
-  slice_sample(prop = 0.065) %>%
-  ungroup()
-
-table(svm_train$damage_grade)
-
-svm_folds <- vfold_cv(
-  svm_train,
-  v = 5,
-  strata = damage_grade
-)
-
-# SVMs need numeric, scaled predictors
-svm_recipe <- recipe(damage_grade ~ ., data = svm_train) %>%
+svm_recipe <- recipe(damage_grade ~ ., data = train_data) %>%
+  step_sample(size = 0.065) %>%
   step_zv(all_predictors()) %>%
   step_dummy(all_nominal_predictors()) %>%
-  step_zv(all_predictors()) %>%   # drops dummy columns for rare levels that are all 0 in a fold
+  step_zv(all_predictors()) %>%
   step_normalize(all_numeric_predictors())
 
-# Class weights: inverse class frequency
-svm_counts <- table(svm_train$damage_grade)
+svm_counts <- table(train_data$damage_grade)
 
 svm_weights <- as.numeric(
   sum(svm_counts) /
@@ -463,7 +445,6 @@ svm_weights <- as.numeric(
 names(svm_weights) <- names(svm_counts)
 svm_weights
 
-# prob.model = FALSE skips kernlab's internal probability CV
 svm_spec <- svm_rbf(cost = tune(), rbf_sigma = tune()) %>%
   set_engine("kernlab", class.weights = !!svm_weights, prob.model = FALSE) %>%
   set_mode("classification")
@@ -472,12 +453,10 @@ svm_workflow <- workflow() %>%
   add_recipe(svm_recipe) %>%
   add_model(svm_spec)
 
-# Quadratic weighted kappa for the ordinal target
 kap_quad <- metric_tweak("kap_quad", kap, weighting = "quadratic")
 
 svm_metrics <- metric_set(f_meas, accuracy, bal_accuracy, kap_quad)
 
-# cost is on a log2 scale, rbf_sigma on a log10 scale 
 svm_grid <- grid_regular(
   cost(range = c(-2, 5)),
   rbf_sigma(range = c(-3, -1)),
@@ -492,7 +471,7 @@ set.seed(2)
 
 svm_tuned <- tune_grid(
   svm_workflow,
-  resamples = svm_folds,
+  resamples = cv_folds,
   grid = svm_grid,
   metrics = svm_metrics,
   control = control_grid(save_pred = FALSE, verbose = TRUE)
@@ -511,26 +490,32 @@ autoplot(svm_tuned)
 svm_best <- select_best(svm_tuned, metric = "f_meas")
 svm_best
 
-svm_final_workflow <- finalize_workflow(svm_workflow, svm_best)
-svm_final_workflow
+svm_cv_workflow <- finalize_workflow(svm_workflow, svm_best)
+svm_cv_workflow
 ```
 
 ```{r svm final fit}
 set.seed(2)
 
-# Larger stratified subsample for the final fit
-svm_train_final <- train_data %>%
-  group_by(damage_grade) %>%
-  slice_sample(prop = 0.20) %>%
-  ungroup()
+svm_final_recipe <- recipe(damage_grade ~ ., data = train_data) %>%
+  step_sample(size = 0.20) %>%
+  step_zv(all_predictors()) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_zv(all_predictors()) %>%
+  step_normalize(all_numeric_predictors())
 
-svm_final_fit <- fit(svm_final_workflow, data = svm_train_final)
+svm_final_workflow <- svm_cv_workflow %>%
+  update_recipe(svm_final_recipe)
 
-# Test set performance
+svm_final_fit <- fit(svm_final_workflow, data = train_data)
+
 svm_predictions <- predict(svm_final_fit, test_data) %>%
   bind_cols(test_data %>% select(damage_grade))
 
 svm_metrics(svm_predictions, truth = damage_grade, estimate = .pred_class)
+
+precision(svm_predictions, truth = damage_grade, estimate = .pred_class)
+recall(svm_predictions, truth = damage_grade, estimate = .pred_class)
 ```
 
 ```{r}
@@ -542,6 +527,15 @@ svm_recall <- svm_predictions %>%
     .groups = "drop"
   )
 svm_recall
+
+svm_precision <- svm_predictions %>%
+  group_by(.pred_class) %>%
+  summarise(
+    precision = mean(.pred_class == damage_grade),
+    predicted = n(),
+    .groups = "drop"
+  )
+svm_precision
 
 svm_confusion <- conf_mat(
   svm_predictions,
@@ -559,6 +553,47 @@ autoplot(svm_confusion, type = "heatmap") +
   theme_minimal()
 ```
 
+```{r svm weights comparison}
+svm_unweighted_spec <- svm_rbf(cost = svm_best$cost, rbf_sigma = svm_best$rbf_sigma) %>%
+  set_engine("kernlab", prob.model = FALSE) %>%
+  set_mode("classification")
+
+svm_unweighted_wf <- workflow() %>%
+  add_recipe(svm_recipe) %>%
+  add_model(svm_unweighted_spec)
+
+set.seed(2)
+svm_unweighted_cv <- fit_resamples(
+  svm_unweighted_wf,
+  resamples = cv_folds,
+  metrics = svm_metrics,
+  control = control_resamples(save_pred = TRUE)
+)
+
+set.seed(2)
+svm_weighted_cv <- fit_resamples(
+  svm_cv_workflow,
+  resamples = cv_folds,
+  metrics = svm_metrics,
+  control = control_resamples(save_pred = TRUE)
+)
+
+bind_rows(
+  collect_metrics(svm_unweighted_cv) %>% mutate(model = "Unweighted"),
+  collect_metrics(svm_weighted_cv) %>% mutate(model = "Weighted")
+) %>%
+  select(model, .metric, mean, std_err)
+
+bind_rows(
+  collect_predictions(svm_unweighted_cv) %>% mutate(model = "Unweighted"),
+  collect_predictions(svm_weighted_cv) %>% mutate(model = "Weighted")
+) %>%
+  group_by(model, damage_grade) %>%
+  summarise(
+    recall = mean(.pred_class == damage_grade),
+    .groups = "drop"
+  )
+```
 
 7. XGBoost
 
