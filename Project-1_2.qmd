@@ -263,6 +263,81 @@ saveRDS(lr_over_results, "lr_oversampling_results.rds")
 ```
 
 
+```{r}
+library(glmnet)
+
+lr_tuned_spec <- multinom_reg(
+  penalty = tune(),
+  mixture = tune()
+) %>%
+  set_engine("glmnet") %>%
+  set_mode("classification")
+
+# Recipe with oversampling
+lr_tuned_recipe <- recipe(
+  damage_grade ~ .,
+  data = train_data
+) %>%
+  step_upsample(damage_grade, over_ratio = 1) %>%
+  step_zv(all_predictors()) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_normalize(all_numeric_predictors())
+
+lr_tuned_workflow <- workflow() %>%
+  add_recipe(lr_tuned_recipe) %>%
+  add_model(lr_tuned_spec)
+
+lr_grid <- grid_regular(
+  penalty(range = c(-4, 0)),
+  mixture(),
+  levels = c(4, 3)
+)
+
+lr_grid
+
+lr_tuned_results <- tune_grid(
+  lr_tuned_workflow,
+  resamples = cv_folds,
+  grid = lr_grid,
+  metrics = metric_set(accuracy, bal_accuracy, f_meas)
+)
+
+collect_metrics(lr_tuned_results)
+
+# Select best hyperparameters
+best_lr <- select_best(
+  lr_tuned_results,
+  metric = "f_meas"
+)
+
+best_lr
+
+final_lr_workflow <- finalize_workflow(
+  lr_tuned_workflow,
+  best_lr
+)
+
+# CV with best parameters as found in previous section
+lr_final_cv <- fit_resamples(
+  final_lr_workflow,
+  resamples = cv_folds,
+  metrics = metric_set(accuracy, bal_accuracy, f_meas), 
+  control = control_resamples(save_pred = TRUE)
+)
+
+lr_final_predictions <- collect_predictions(
+  lr_final_cv
+)
+
+lr_final_conf_mat <- lr_final_predictions %>% conf_mat(truth = damage_grade, estimate = .pred_class)
+
+lr_final_conf_mat
+
+autoplot(lr_final_conf_mat, type = "heatmap")
+saveRDS(lr_tuned_results, "lr_tuned_oversampling_results.rds")
+```
+
+
 5. Random Forest 
 ```{r}
 rf_spec <- rand_forest(mode = "classification", trees = tune(), min_n = tune(), mtry = tune()) |>
