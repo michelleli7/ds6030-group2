@@ -561,7 +561,68 @@ autoplot(svm_confusion, type = "heatmap") +
 
 
 7. XGBoost
+```{r cache-xgb-model}
+#| message: FALSE
+#| warning: FALSE
+#| cache: TRUE
+library(xgboost)
+library(vip)
+library(yardstick)
+set.seed(2)
+library(future)
 
+plan(multisession,
+     workers = max(1, parallel::detectCores(logical = FALSE) - 1))
+
+xgb_model <- boost_tree(mode = "classification", 
+  trees = tune(), min_n = tune(), learn_rate = tune(), tree_depth = tune()) |>
+  set_engine("xgboost", nthread = 1)
+
+xgb_recipe <- recipe(damage_grade ~ ., data = train_data) |>
+  step_dummy(all_nominal_predictors())
+
+xgb_wf <- workflow() |>
+  add_model(xgb_model) |>
+  add_recipe(xgb_recipe) 
+
+xgb_parameters <- extract_parameter_set_dials(xgb_wf) |>
+  update(
+    trees = trees(c(100, 300)),
+    min_n = min_n(c(1, 10)),
+    learn_rate = learn_rate(c(0.1, 0.3), trans = NULL),
+    tree_depth = tree_depth(c(3, 9))
+  )
+
+macro_f1 <- metric_tweak("macro_f1", f_meas, estimator = "macro")
+
+xgb_tune_results <- tune_grid(xgb_wf,
+  resamples = cv_folds, 
+  grid = grid_regular(xgb_parameters, levels = 3),
+  metrics = metric_set(macro_f1),
+  control = control_grid(
+    allow_par = TRUE,
+    parallel_over = "resamples"
+  ))
+
+autoplot(xgb_tune_results)
+```
+
+```{r}
+xgb_best_parameters <- select_best(xgb_tune_results, metric = "macro_f1") |>
+  select(-.config)
+
+xgb_final <- xgb_wf |>
+  finalize_workflow(xgb_best_parameters) |>
+  fit(train_data)
+
+xgb_pred <- augment(xgb_final, test_data)
+
+xgb_pred |>
+  metric_set(accuracy, precision, recall, f_meas)(
+    truth = damage_grade,
+    estimate = .pred_class
+  )
+```
 
 8. LDA
 ```{r}
